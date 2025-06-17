@@ -76,31 +76,52 @@ def initialize_app(main_window_ref):
 
 
 # --- MODIFIED FUNCTION ---
-def refetch_cache():
+# In app_logic.py
+
+# --- MODIFIED FUNCTION ---
+# --- MODIFIED FUNCTION ---
+# --- MODIFIED FUNCTION ---
+def refetch_cache(main_window_ref):
     """
-    Fetches the top-level Document Hubs from the Alation instance.
+    Fetches all folder data and populates the first dropdown.
     """
     print("LOG: User clicked 'Re-fetch Cache'.")
-
     url = app_settings.get("alation_url")
     if not url:
         print("ERROR: Alation URL not configured.")
         return
 
-    # Per Alation API docs, Doc Hubs are top-level folders in the default hub (ID 1).
-    # We are looking for folders that are direct children of the root folder (ID 1)
-    # within the default document hub (ID 1).
-    params = {
-        'document_hub_id': 1,
-        'parent_folder_id': 1
-    }
+    # --- Reset UI and data ---
+    main_window_ref.hub_combobox['values'] = []
+    main_window_ref.folder_combobox['values'] = []
+    main_window_ref.folder_combobox.set('')
+    main_window_ref.folder_combobox.config(state="disabled")
+    main_window_ref.template_combobox['values'] = []
+    main_window_ref.template_combobox.set('')
+    main_window_ref.template_combobox.config(state="disabled")
+    global app_data
+    app_data = AppData()
 
-    doc_hubs = alation_api.get_folders(url, params=params)
+    app_data.all_folders = alation_api.get_folders(url, params=None)
 
-    if doc_hubs:
-        print("LOG: Successfully fetched top-level Document Hubs:")
-        for hub in doc_hubs:
-            # The API returns a list of folder objects. We print their titles.
-            print(f"  - ID: {hub.get('id')}, Title: {hub.get('title')}")
+    if not app_data.all_folders:
+        print("LOG: Could not fetch any folders or none were found.")
+        return
+
+    # --- NEW, SIMPLIFIED LOGIC ---
+    # 1. Get a unique, sorted list of all Document Hub IDs from the data
+    all_hub_ids = set()
+    for folder in app_data.all_folders:
+        hub_id = folder.get('document_hub_id')
+        if hub_id:
+            all_hub_ids.add(hub_id)
+
+    sorted_hub_ids = sorted(list(all_hub_ids))
+
+    # 2. Populate the first dropdown with the discovered Hub IDs
+    if sorted_hub_ids:
+        main_window_ref.hub_combobox['values'] = sorted_hub_ids
+        main_window_ref.hub_combobox.config(state="readonly")
+        print(f"LOG: Found and populated {len(sorted_hub_ids)} Document Hubs.")
     else:
-        print("LOG: Could not fetch Document Hubs or none were found.")
+        print("LOG: No Document Hubs could be identified from the folder list.")

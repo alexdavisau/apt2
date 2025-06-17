@@ -1,6 +1,7 @@
 # gui.py
 import tkinter as tk
 from tkinter import scrolledtext, Toplevel, Frame, Button, Label, Entry, messagebox
+from tkinter.ttk import Combobox  # Using themed Combobox for a better look
 import app_logic
 
 
@@ -13,7 +14,7 @@ class MainWindow(Frame):
         Frame.__init__(self, parent, *args, **kwargs)
         self.parent = parent
         self.parent.title("APT - Alation Power Tools")
-        self.parent.geometry("700x500")
+        self.parent.geometry("700x600")  # Increased height for new widgets
 
         # --- Menu Bar ---
         self.menu_bar = tk.Menu(self.parent)
@@ -28,26 +29,47 @@ class MainWindow(Frame):
         top_frame = Frame(self.parent, borderwidth=2, relief="groove")
         top_frame.pack(side="top", fill="x", padx=10, pady=10)
 
-        middle_frame = Frame(self.parent, borderwidth=2, relief="groove")
-        middle_frame.pack(side="top", fill="both", expand=True, padx=10, pady=5)
+        # --- NEW: Template Selection Frame ---
+        selection_frame = Frame(self.parent, borderwidth=2, relief="groove")
+        selection_frame.pack(side="top", fill="x", padx=10, pady=5)
+        selection_frame.columnconfigure(1, weight=1)  # Make combobox column expandable
+
+        log_frame = Frame(self.parent, borderwidth=2, relief="groove")
+        log_frame.pack(side="top", fill="both", expand=True, padx=10, pady=5)
 
         # --- Top Frame Widgets (Buttons) ---
-        self.btn_refetch_cache = Button(top_frame, text="Re-fetch Cache", command=app_logic.refetch_cache)
+        self.btn_refetch_cache = Button(top_frame, text="Re-fetch Cache", command=lambda: app_logic.refetch_cache(self))
         self.btn_refetch_cache.pack(side="left", padx=5, pady=5)
-        # Initially disabled until credentials are loaded and valid
         self.btn_refetch_cache.config(state="disabled")
 
-        # --- Middle Frame Widgets (Logging) ---
-        log_label = Label(middle_frame, text="Activity Log:")
+        # --- NEW: Selection Frame Widgets ---
+        Label(selection_frame, text="Document Hub ID:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        self.hub_combobox = Combobox(selection_frame, state="readonly")
+        self.hub_combobox.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+        self.hub_combobox.bind("<<ComboboxSelected>>", lambda event: app_logic.on_hub_selected(self, event))
+
+        Label(selection_frame, text="Folder:").grid(row=1, column=0, padx=5, pady=5, sticky="w")
+        self.folder_combobox = Combobox(selection_frame, state="disabled")
+        self.folder_combobox.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
+        self.folder_combobox.bind("<<ComboboxSelected>>", lambda event: app_logic.on_folder_selected(self, event))
+
+        Label(selection_frame, text="Template:").grid(row=2, column=0, padx=5, pady=5, sticky="w")
+        self.template_combobox = Combobox(selection_frame, state="disabled")
+        self.template_combobox.grid(row=2, column=1, padx=5, pady=5, sticky="ew")
+
+        self.btn_generate = Button(selection_frame, text="Generate Template", state="disabled")
+        self.btn_generate.grid(row=3, column=1, padx=5, pady=10, sticky="e")
+
+        # --- Log Frame Widgets (Logging) ---
+        log_label = Label(log_frame, text="Activity Log:")
         log_label.pack(side="top", anchor="w", padx=5)
-        self.log_text = scrolledtext.ScrolledText(middle_frame, wrap=tk.WORD, state='disabled')
+        self.log_text = scrolledtext.ScrolledText(log_frame, wrap=tk.WORD, state='disabled')
         self.log_text.pack(fill="both", expand=True, padx=5, pady=5)
 
     def open_settings_window(self):
         """Opens the settings window."""
-        # Check if a settings window already exists
         if hasattr(self, 'settings_window') and self.settings_window.winfo_exists():
-            self.settings_window.lift()  # Bring to front if already open
+            self.settings_window.lift()
         else:
             self.settings_window = Toplevel(self.parent)
             self.settings_frame = SettingsWindow(self.settings_window)
@@ -55,40 +77,29 @@ class MainWindow(Frame):
 
 
 class SettingsWindow(Frame):
-    """
-    The settings window for entering credentials.
-    """
+    """ The settings window for entering credentials. """
 
     def __init__(self, parent, *args, **kwargs):
         Frame.__init__(self, parent, *args, **kwargs)
         self.parent = parent
         self.parent.title("Settings")
         self.parent.geometry("400x200")
-
-        # --- Widgets ---
         Label(self, text="Alation URL:").grid(row=0, column=0, sticky="w", padx=5, pady=5)
         self.url_entry = Entry(self, width=40)
         self.url_entry.grid(row=0, column=1, padx=5, pady=5)
-
         Label(self, text="Refresh Token:").grid(row=1, column=0, sticky="w", padx=5, pady=5)
         self.token_entry = Entry(self, width=40, show="*")
         self.token_entry.grid(row=1, column=1, padx=5, pady=5)
-
         Label(self, text="User ID:").grid(row=2, column=0, sticky="w", padx=5, pady=5)
         self.user_id_entry = Entry(self, width=40)
         self.user_id_entry.grid(row=2, column=1, padx=5, pady=5)
-
-        # --- Buttons ---
         button_frame = Frame(self)
         button_frame.grid(row=3, columnspan=2, pady=10)
         Button(button_frame, text="Save Settings", command=self.save_and_close).pack(side="left", padx=5)
         Button(button_frame, text="Cancel", command=self.parent.destroy).pack(side="left", padx=5)
-
-        # --- NEW: Load existing settings when window opens ---
         self.load_existing_settings()
 
     def load_existing_settings(self):
-        """Pre-populates the fields with saved settings."""
         settings = app_logic.load_settings()
         if settings:
             self.url_entry.insert(0, settings.get("alation_url", ""))
@@ -96,12 +107,9 @@ class SettingsWindow(Frame):
             self.user_id_entry.insert(0, settings.get("user_id", ""))
 
     def save_and_close(self):
-        """Saves the settings and closes the window."""
-        # --- MODIFIED: Call save_settings from app_logic ---
         url = self.url_entry.get()
         token = self.token_entry.get()
         user_id = self.user_id_entry.get()
-
         if app_logic.save_settings(url, token, user_id):
             messagebox.showinfo("Success", "Settings saved successfully.")
             self.parent.destroy()
