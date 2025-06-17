@@ -6,11 +6,13 @@ CONFIG_FILE = "config.json"
 app_settings = {}
 
 
+# --- CORRECTED CLASS DEFINITION ---
 class AppData:
     def __init__(self):
-        self.all_folders = [];
-        self.id_to_title_map = {};
+        self.all_folders = []
+        self.id_to_title_map = {}
         self.doc_hubs = {}
+        self.template_title_to_id_map = {}  # This attribute is now correctly included
 
 
 app_data = AppData()
@@ -94,7 +96,7 @@ def on_hub_selected(main_window_ref, event):
     main_window_ref.template_combobox['values'] = [];
     main_window_ref.template_combobox.set('')
     folders_in_hub = [f for f in app_data.all_folders if f.get('document_hub_id') == selected_hub_id]
-    folders_by_parent = {}
+    folders_by_parent = {};
     for folder in folders_in_hub:
         parent_id = folder.get('parent_folder_id')
         if parent_id not in folders_by_parent: folders_by_parent[parent_id] = []
@@ -115,84 +117,61 @@ def build_folder_tree(tree, parent_item, folders_by_parent, parent_id):
 
 
 def on_folder_selected(main_window_ref, event):
-    """
-    Event handler for when a user selects a folder in the Treeview.
-    This now calls the /document/ endpoint to find available templates.
-    """
     selected_items = main_window_ref.folder_tree.selection()
     if not selected_items: return
-
-    selected_folder_id = int(selected_items[0])
+    selected_folder_id = int(selected_items[0]);
     selected_title = app_data.id_to_title_map.get(selected_folder_id, "Unknown")
     print(f"LOG: User selected Folder: '{selected_title}'")
 
-    # Clear subsequent dropdown
-    main_window_ref.template_combobox['values'] = []
+    main_window_ref.template_combobox['values'] = [];
     main_window_ref.template_combobox.set('')
+    global app_data;
+    app_data.template_title_to_id_map = {}
 
-    # --- NEW LOGIC: Use /document/ endpoint ---
-    url = app_settings.get("alation_url")
+    url = app_settings.get("alation_url");
     hub_id = int(main_window_ref.hub_combobox.get())
-
     documents = alation_api.get_documents(url, hub_id, selected_folder_id)
 
     if documents:
-        template_ids = set()
-        for doc in documents:
-            if doc.get('template_id'):
-                template_ids.add(doc.get('template_id'))
+        template_ids = set(doc.get('template_id') for doc in documents if doc.get('template_id'))
+        if template_ids:
+            print(f"LOG: Found {len(template_ids)} unique template IDs from documents.")
+            template_names = []
+            for t_id in template_ids:
+                name = alation_api.get_template_name(url, t_id)
+                app_data.template_title_to_id_map[name] = t_id
+                template_names.append(name)
 
-        template_list = sorted(list(template_ids))
-        main_window_ref.template_combobox['values'] = template_list
-        if template_list:
+            main_window_ref.template_combobox['values'] = sorted(template_names)
             main_window_ref.template_combobox.config(state="readonly")
-            print(f"LOG: Found {len(template_list)} templates from documents in this folder.")
         else:
-            main_window_ref.template_combobox.config(state="disabled")
+            main_window_ref.template_combobox.config(state="disabled");
             print("LOG: Documents in this folder do not have any associated templates.")
     else:
-        main_window_ref.template_combobox.config(state="disabled")
+        main_window_ref.template_combobox.config(state="disabled");
         print("LOG: No documents found in this folder.")
 
 
 def on_template_selected(main_window_ref, event):
     selected_template = main_window_ref.template_combobox.get()
-    print(f"LOG: User selected Template ID: {selected_template}")
+    print(f"LOG: User selected Template: '{selected_template}'")
     if main_window_ref.folder_tree.selection():
         main_window_ref.btn_generate.config(state="normal")
 
 
-# In app_logic.py
-
 def generate_template(main_window_ref):
-    """
-    Fetches the details for the selected template, adds the built-in 'Title' field,
-    and logs the complete list of fields.
-    """
     print("LOG: User clicked 'Generate Template'.")
     url = app_settings.get("alation_url")
-
     selected_template_name = main_window_ref.template_combobox.get()
-    # Using the title-to-ID map we created in on_hub_selected
     selected_template_id = app_data.template_title_to_id_map.get(selected_template_name)
-
     if not url or not selected_template_id:
-        print("ERROR: URL or Template not selected correctly.")
+        print("ERROR: URL or Template not selected correctly.");
         return
-
     template_details = alation_api.get_template_details(url, selected_template_id)
-
     if template_details and 'fields' in template_details:
-
-        # --- CORRECTED LOGIC: Manually add ONLY the 'Title' field ---
-        all_fields = [
-            {'name_singular': 'Title', 'field_type': 'TEXT'},
-        ]
-
-        # Add the custom fields from the API response
+        all_fields = [{'name_singular': 'Title', 'field_type': 'TEXT'}]
         all_fields.extend(template_details['fields'])
-
-        print(f"--- Fields for Template ID: {selected_template_id} ({selected_template_name}) ---")
+        print(f"--- Fields for Template ID: {selected_template_id} ('{selected_template_name}') ---")
         for field in all_fields:
             print(f"  - Field Name: {field.get('name_singular')}, Type: {field.get('field_type')}")
         print("---------------------------------------")
