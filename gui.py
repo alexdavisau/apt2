@@ -84,9 +84,26 @@ class SettingsWindow(Frame):
         Button(button_frame, text="Save Settings", command=self.save_and_close).pack(side="left", padx=5)
         Button(button_frame, text="Cancel", command=self.parent.destroy).pack(side="left", padx=5)
 
+        # --- NEW: Load existing settings when window opens ---
+        self.load_existing_settings()
+
+    def load_existing_settings(self):
+        """Pre-populates the fields with saved settings."""
+        settings = app_logic.load_settings()
+        if settings:
+            self.url_entry.insert(0, settings.get("alation_url", ""))
+            self.token_entry.insert(0, settings.get("refresh_token", ""))
+            self.user_id_entry.insert(0, settings.get("user_id", ""))
+
     def save_and_close(self):
         """Saves the settings and closes the window."""
-        # Placeholder for saving logic
-        messagebox.showinfo("Save",
-                            "Settings saved (placeholder). Application will need to be restarted to apply changes.")
-        self.parent.destroy()
+        # --- MODIFIED: Call save_settings from app_logic ---
+        url = self.url_entry.get()
+        token = self.token_entry.get()
+        user_id = self.user_id_entry.get()
+
+        if app_logic.save_settings(url, token, user_id):
+            messagebox.showinfo("Success", "Settings saved successfully.")
+            self.parent.destroy()
+        else:
+            messagebox.showerror("Error", "Failed to save settings. Check logs for details.")

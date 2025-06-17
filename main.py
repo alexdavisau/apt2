@@ -30,11 +30,11 @@ def main():
     main_window.pack(side="top", fill="both", expand=True)
 
     # --- Setup Logging to UI ---
-    # Redirect the standard output to the log text widget
     sys.stdout = TextRedirector(main_window.log_text, "stdout")
 
     # --- Run App Initialization Logic ---
-    app_logic.initialize_app()
+    # MODIFIED: Pass the main_window object to the function
+    app_logic.initialize_app(main_window)
 
     # --- Start the GUI Main Loop ---
     root.mainloop()
