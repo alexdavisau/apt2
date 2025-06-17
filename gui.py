@@ -1,7 +1,7 @@
 # gui.py
 import tkinter as tk
 from tkinter import scrolledtext, Toplevel, Frame, Button, Label, Entry, messagebox
-from tkinter.ttk import Combobox  # Using themed Combobox for a better look
+from tkinter.ttk import Combobox, Treeview  # Make sure Treeview is imported
 import app_logic
 
 
@@ -14,7 +14,7 @@ class MainWindow(Frame):
         Frame.__init__(self, parent, *args, **kwargs)
         self.parent = parent
         self.parent.title("APT - Alation Power Tools")
-        self.parent.geometry("700x600")  # Increased height for new widgets
+        self.parent.geometry("700x600")
 
         # --- Menu Bar ---
         self.menu_bar = tk.Menu(self.parent)
@@ -29,10 +29,9 @@ class MainWindow(Frame):
         top_frame = Frame(self.parent, borderwidth=2, relief="groove")
         top_frame.pack(side="top", fill="x", padx=10, pady=10)
 
-        # --- NEW: Template Selection Frame ---
         selection_frame = Frame(self.parent, borderwidth=2, relief="groove")
         selection_frame.pack(side="top", fill="x", padx=10, pady=5)
-        selection_frame.columnconfigure(1, weight=1)  # Make combobox column expandable
+        selection_frame.columnconfigure(1, weight=1)
 
         log_frame = Frame(self.parent, borderwidth=2, relief="groove")
         log_frame.pack(side="top", fill="both", expand=True, padx=10, pady=5)
@@ -42,16 +41,18 @@ class MainWindow(Frame):
         self.btn_refetch_cache.pack(side="left", padx=5, pady=5)
         self.btn_refetch_cache.config(state="disabled")
 
-        # --- NEW: Selection Frame Widgets ---
+        # --- Selection Frame Widgets ---
         Label(selection_frame, text="Document Hub ID:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
         self.hub_combobox = Combobox(selection_frame, state="readonly")
         self.hub_combobox.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
         self.hub_combobox.bind("<<ComboboxSelected>>", lambda event: app_logic.on_hub_selected(self, event))
 
-        Label(selection_frame, text="Folder:").grid(row=1, column=0, padx=5, pady=5, sticky="w")
-        self.folder_combobox = Combobox(selection_frame, state="disabled")
-        self.folder_combobox.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
-        self.folder_combobox.bind("<<ComboboxSelected>>", lambda event: app_logic.on_folder_selected(self, event))
+        Label(selection_frame, text="Folder:").grid(row=1, column=0, padx=5, pady=5, sticky="nw")
+
+        # This is the line that creates the attribute that was missing
+        self.folder_tree = Treeview(selection_frame, selectmode="browse", height=5)
+        self.folder_tree.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
+        self.folder_tree.bind("<<TreeviewSelect>>", lambda event: app_logic.on_folder_selected(self, event))
 
         Label(selection_frame, text="Template:").grid(row=2, column=0, padx=5, pady=5, sticky="w")
         self.template_combobox = Combobox(selection_frame, state="disabled")
@@ -60,14 +61,13 @@ class MainWindow(Frame):
         self.btn_generate = Button(selection_frame, text="Generate Template", state="disabled")
         self.btn_generate.grid(row=3, column=1, padx=5, pady=10, sticky="e")
 
-        # --- Log Frame Widgets (Logging) ---
+        # --- Log Frame Widgets ---
         log_label = Label(log_frame, text="Activity Log:")
         log_label.pack(side="top", anchor="w", padx=5)
         self.log_text = scrolledtext.ScrolledText(log_frame, wrap=tk.WORD, state='disabled')
         self.log_text.pack(fill="both", expand=True, padx=5, pady=5)
 
     def open_settings_window(self):
-        """Opens the settings window."""
         if hasattr(self, 'settings_window') and self.settings_window.winfo_exists():
             self.settings_window.lift()
         else:
@@ -77,8 +77,6 @@ class MainWindow(Frame):
 
 
 class SettingsWindow(Frame):
-    """ The settings window for entering credentials. """
-
     def __init__(self, parent, *args, **kwargs):
         Frame.__init__(self, parent, *args, **kwargs)
         self.parent = parent
