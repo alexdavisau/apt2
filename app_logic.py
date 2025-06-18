@@ -117,27 +117,39 @@ def build_folder_tree(tree, parent_item, folders_by_parent, parent_id):
 
 
 def on_folder_selected(main_window_ref, event):
+    """
+    Event handler for when a user selects a folder in the Treeview.
+    This calls the /document/ endpoint to find available templates.
+    """
     selected_items = main_window_ref.folder_tree.selection()
-    if not selected_items: return
-    selected_folder_id = int(selected_items[0]);
+    if not selected_items:
+        return
+
+    selected_folder_id = int(selected_items[0])
     selected_title = app_data.id_to_title_map.get(selected_folder_id, "Unknown")
     print(f"LOG: User selected Folder: '{selected_title}'")
 
-    main_window_ref.template_combobox['values'] = [];
+    # Clear subsequent dropdown and reset the map
+    main_window_ref.template_combobox['values'] = []
     main_window_ref.template_combobox.set('')
-    global app_data;
-    app_data.template_title_to_id_map = {}
+    app_data.template_title_to_id_map = {}  # The unnecessary 'global' keyword is removed.
 
-    url = app_settings.get("alation_url");
+    url = app_settings.get("alation_url")
     hub_id = int(main_window_ref.hub_combobox.get())
+
     documents = alation_api.get_documents(url, hub_id, selected_folder_id)
 
     if documents:
-        template_ids = set(doc.get('template_id') for doc in documents if doc.get('template_id'))
+        template_ids = set()
+        for doc in documents:
+            if doc.get('template_id'):
+                template_ids.add(doc.get('template_id'))
+
         if template_ids:
             print(f"LOG: Found {len(template_ids)} unique template IDs from documents.")
             template_names = []
             for t_id in template_ids:
+                # Use the new get_template_name function
                 name = alation_api.get_template_name(url, t_id)
                 app_data.template_title_to_id_map[name] = t_id
                 template_names.append(name)
@@ -145,10 +157,10 @@ def on_folder_selected(main_window_ref, event):
             main_window_ref.template_combobox['values'] = sorted(template_names)
             main_window_ref.template_combobox.config(state="readonly")
         else:
-            main_window_ref.template_combobox.config(state="disabled");
+            main_window_ref.template_combobox.config(state="disabled")
             print("LOG: Documents in this folder do not have any associated templates.")
     else:
-        main_window_ref.template_combobox.config(state="disabled");
+        main_window_ref.template_combobox.config(state="disabled")
         print("LOG: No documents found in this folder.")
 
 
